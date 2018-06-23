@@ -1,0 +1,133 @@
+Parameters:
+  KeyName:
+    Description: "KeyName for SSH-ing into the EC2 machines"
+    Type: AWS::EC2::KeyPair::KeyName
+    Default: kk-1
+    ConstraintDescription: Provide exisiting KeyPair
+
+  MyVpcCidrBlock:
+    Description: CIDR Block for MyVPC
+    Type: String
+    Default: 10.0.0.0/16
+
+  MyVpcSubnets:
+    Description: Subnets for MyVPC
+    Type: CommaDelimitedList
+    Default: "10.0.0.0/24, 10.0.1.0/24, 10.0.2.0/24"
+
+  MyAz:
+    Description: AvailabilityZones
+    Type: String
+    Default: us-east-1a
+
+  MyImageId:
+    Description: Amazon Linux AMI 2018.03.0 (HVM), SSD Volume Type 
+    Type: String
+    Default: ami-14c5486b
+
+  MyNatImageId:
+    Description: Amazon Linux AMI 2018.03.0 (HVM), SSD Volume Type 
+    Type: String
+    Default: ami-01623d7b
+
+Resources:
+  MyVpc:
+    Description: Private VPC 
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !Ref MyVpcCidrBlock
+      EnableDnsSupport: True
+      Tags:
+        - Key: Name 
+          Value: My CF VPC 
+  
+  FrontEndSubnet:
+    Description: Web Tier Subnet 
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: !Ref MyAz 
+      CidrBlock: !Select [0, !Ref MyVpcSubnets]
+      VpcId: !Ref MyVpc
+      Tags:
+        - Key: Name
+          Value: Web FrontEndSubnet
+
+  BackEndSubnet:
+    Description: Db Tier Subnet 
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: !Ref MyAz 
+      CidrBlock: !Select [1, !Ref MyVpcSubnets]
+      VpcId: !Ref MyVpc
+      Tags:
+        - Key: Name
+          Value: DataBase BackEndSubnet
+
+  InternetGateway:
+    Description: IG for MyVpc
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: IG for MyVpc
+
+  AttachInternetGatewayToMyVpc:
+    Description: Attaching the previously created IG to MyVpc
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      InternetGatewayId: !Ref InternetGateway
+      VpcId: !Ref MyVpc
+
+  FrontEndSubnetRouteTable:
+    Description: Route Table for Web Tier
+    Type: AWS::EC2::RouteTable 
+    Properties:
+      VpcId: !Ref MyVpc
+      Tags:
+        - Key: Name
+          Value: FrontEndSubnet RouteTable
+
+  AssociateFrondEndRouteTable:
+    Description: Associate FrondEndRouteTable to FrontEndSubnet
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties: 
+      RouteTableId: !Ref FrontEndSubnetRouteTable
+      SubnetId: !Ref FrontEndSubnet
+
+  BackEndSubnetRouteTable:
+    Description: Route Table for DataBase Tier
+    Type: AWS::EC2::RouteTable 
+    Properties:
+      VpcId: !Ref MyVpc
+      Tags:
+        - Key: Name
+          Value: BackEndSubnet RouteTable
+
+  AssociateBackEndRouteTable:
+    Description: Associate BackEndRouteTable to FrontEndSubnet
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties: 
+      RouteTableId: !Ref BackEndSubnetRouteTable
+      SubnetId: !Ref BackEndSubnet
+
+  FrontEndSubnetDefaultRoute:
+    Description: Default route out of Internet Gateway for FrontEndSubnet
+    Type: AWS::EC2::Route
+    Properties: 
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+      RouteTableId: !Ref FrontEndSubnetRouteTable
+
+  NatInstance:
+    Description: NAT Instance for DB Tier internet access
+    Type: AWS::EC2::Instance
+    Properties:
+      AvailabilityZone: !Ref MyAz
+      ImageId: !Ref MyNatImageId
+      InstanceType: t2.micro 
+      KeyName: !Ref KeyName
+      SubnetId: !Ref FrontEndSubnet
+      SourceDestCheck: False
+      Tags:
+        - Key: Name
+          Value: My NAT Instance
