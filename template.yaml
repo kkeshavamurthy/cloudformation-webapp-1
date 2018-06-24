@@ -1,3 +1,5 @@
+AWSTemplateFormatVersion: '2010-09-09'
+
 Parameters:
   KeyName:
     Description: "KeyName for SSH-ing into the EC2 machines"
@@ -118,6 +120,14 @@ Resources:
       GatewayId: !Ref InternetGateway
       RouteTableId: !Ref FrontEndSubnetRouteTable
 
+  BackEndSubnetDefaultRoute:
+    Description: Default route via NAT Instance for DB Tier
+    Type: AWS::EC2::Route 
+    Properties:
+      DestinationCidrBlock: 0.0.0.0/0
+      InstanceId: !Ref NatInstance
+      RouteTableId: !Ref BackEndSubnetRouteTable
+
   NatInstance:
     Description: NAT Instance for DB Tier internet access
     Type: AWS::EC2::Instance
@@ -131,3 +141,46 @@ Resources:
       Tags:
         - Key: Name
           Value: My NAT Instance
+
+  FrontEndSecurityGroup:
+    Description: SG for the web Tier
+    Type: AWS::EC2::SecurityGroup 
+    Properties:
+      GroupName: WebSG
+      GroupDescription: SG allows HTTP/HTTPS, ICMPv4 & SSH
+      VpcId: !Ref MyVpc
+      SecurityGroupIngress:
+        - IpProtocol: TCP
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: TCP
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: TCP
+          FromPort: -1
+          ToPort: 22
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: ICMP
+          FromPort: 8
+          ToPort: -1
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: FrontEndSG 
+
+  BackEndSecurityGroup:
+    Description: SG for Web Tier. Allow connectivity from Web tier only
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: DbSG
+      GroupDescription: SG allows connection from FrontEndSecurityGroup only
+      VpcId: !Ref MyVpc
+      SecurityGroupIngress:
+        - IpProtocol: TCP
+          ToPort: 3309
+          FromPort: -1
+          CidrIp: !Ref BackEndSubnet
+
+
