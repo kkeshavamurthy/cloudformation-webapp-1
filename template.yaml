@@ -182,5 +182,48 @@ Resources:
           ToPort: 3309
           FromPort: -1
           CidrIp: !Ref BackEndSubnet
+      Tags:
+        - Key: Name
+          Value: BackEndSG 
+
+  MyElb:
+    Description: Internet facing Application LB
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+        Name: MyELB
+        Scheme: internet-facing
+        SecurityGroups: !Ref FrontEndSecurityGroup
+        Subnets:
+          - FrontEndSubnet
+        Type: application 
+        Tags:
+          - Key: Name
+            Value: MyApplicationELB
+
+  MyElbListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      LoadBalancerArn: !Ref MyElb
+      Port: 80
+      Protocol: HTTP
+      DefaultActions: 
+        - Type: Forward
+          TargetGroupArn: !Ref WebASG
+      Tags: 
+        - Key: Name
+          Value: MyElbListener
+
+  WebTargetGroup:
+    Description: Target LB Group for Web tier. 
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Name: WebTargetGroup
+      Port: 80
+      Protocol: HTTP 
+      VpcId: !Ref MyVpc
+      
+
+
+
 
 
